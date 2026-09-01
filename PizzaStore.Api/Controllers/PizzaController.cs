@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PizzaStore.Api.Data;
 using PizzaStore.Api.DTOs;
+using PizzaStore.Api.Infrastructure;
 using PizzaStore.Api.Models;
 
 namespace PizzaStore.Api.Controllers;
@@ -89,7 +90,15 @@ public class PizzasController : ControllerBase
         };
 
         _context.Pizzas.Add(pizza);
-        await _context.SaveChangesAsync();
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+        {
+            return Conflict(new { message = $"A pizza named '{normalizedName}' already exists." });
+        }
 
         // reload with toppings included for the response
         await _context.Entry(pizza)
@@ -121,7 +130,15 @@ public class PizzasController : ControllerBase
         pizza.Description = dto.Description;
         pizza.Price = dto.Price;
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+        {
+            return Conflict(new { message = $"A pizza named '{normalizedName}' already exists." });
+        }
+
         return NoContent();
     }
 
