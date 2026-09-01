@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PizzaStore.Api.Data;
 using PizzaStore.Api.DTOs;
+using PizzaStore.Api.Infrastructure;
 using PizzaStore.Api.Models;
 
 namespace PizzaStore.Api.Controllers;
@@ -54,7 +55,17 @@ public class ToppingsController : ControllerBase
 
         var topping = new Topping { Name = normalizedName };
         _context.Toppings.Add(topping);
-        await _context.SaveChangesAsync();
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+        {
+            // Lost a race: another request inserted the same name between our
+            // AnyAsync check and this SaveChangesAsync. The unique index caught it.
+            return Conflict(new { message = $"A topping named '{normalizedName}' already exists." });
+        }
 
         var result = new ToppingDto { Id = topping.Id, Name = topping.Name };
         return CreatedAtAction(nameof(GetTopping), new { id = topping.Id }, result);
@@ -77,7 +88,15 @@ public class ToppingsController : ControllerBase
             return Conflict(new { message = $"A topping named '{normalizedName}' already exists." });
 
         topping.Name = normalizedName;
-        await _context.SaveChangesAsync();
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+        {
+            return Conflict(new { message = $"A topping named '{normalizedName}' already exists." });
+        }
 
         return NoContent();
     }
